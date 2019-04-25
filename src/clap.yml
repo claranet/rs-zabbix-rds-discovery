@@ -1,0 +1,18 @@
+name: rs-zabbix-rds-discovery
+version: "0.1.0"
+author: Adrien Bréfort <adrien.brefort@fr.clara.net>
+about: Discovers RDS instances for Zabbix
+args:
+    - role:
+        short: r
+        long: role
+        value_name: ROLE_ARN
+        help: ARN of assumed role
+        required: true
+        takes_value: true
+    - region:
+        short: R
+        long: region
+        value_name: REGION
+        required: true
+        takes_value: true

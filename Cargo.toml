@@ -1,0 +1,11 @@
+[package]
+name = "rs-zabbix-rds-discovery"
+version = "0.1.0"
+authors = ["Adrien Bréfort <adrien.brefort@fr.clara.net>"]
+edition = "2018"
+
+[dependencies]
+rusoto_core = {version = "0.38.0",  default_features = false, features=["rustls"]}
+rusoto_sts = {version = "0.38.0",  default_features = false, features=["rustls"]}
+rusoto_rds = {version = "0.38.0",  default_features = false, features=["rustls"]}
+clap = {version = "2.33", features = ["yaml"]}
