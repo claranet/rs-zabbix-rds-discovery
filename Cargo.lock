@@ -834,6 +834,7 @@ version = "0.1.0"
 dependencies = [
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rusoto_core 0.38.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rusoto_credential 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rusoto_rds 0.38.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rusoto_sts 0.38.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
