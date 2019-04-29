@@ -107,7 +107,7 @@ fn main() {
         .value_of("region")
         .unwrap()
         .parse::<Region>()
-        .unwrap();
+        .expect("Could not parse region");
     let role = matches.value_of("role").unwrap();
 
     // Get auto-refreshing credentials from STS
