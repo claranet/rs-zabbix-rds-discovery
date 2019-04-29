@@ -35,47 +35,14 @@ struct DiscoveryEntry {
     port: i64,
 }
 
-fn main() {
+fn discover_rds_instances(client: RdsClient, tags: Option<Vec<ArgTag>>) -> Vec<DiscoveryEntry> {
     let mut data = vec![];
-
-    // Parse CLI parameters
-    let yaml = load_yaml!("clap.yml");
-    let matches = App::from_yaml(yaml).get_matches();
-
-    let region = matches
-        .value_of("region")
-        .unwrap()
-        .parse::<Region>()
-        .unwrap();
-    let role = matches.value_of("role").unwrap();
-
-    // Get auto-refreshing credentials from STS
-    let sts = StsClient::new(region.clone());
-
-    let provider = StsAssumeRoleSessionCredentialsProvider::new(
-        sts,
-        role.to_owned(),
-        "zabbix-discovery".to_owned(),
-        None,
-        None,
-        None,
-        None,
-    );
-
-    let auto_refreshing_provider =
-        AutoRefreshingProvider::new(provider).expect("Could not get auto refreshing STS provider");
 
     // Get RDS Instances
     // TODO: implement pagination, we are currenty limited to 100 RDS instances.
     //       This should be enough for now.
-    let rds = RdsClient::new_with(
-        HttpClient::new().expect("Could not get HTTP client"),
-        auto_refreshing_provider,
-        region.clone(),
-    );
-
     let ddbi_message = DescribeDBInstancesMessage::default();
-    let dbi_message = rds
+    let dbi_message = client
         .describe_db_instances(ddbi_message)
         .sync()
         .expect("Could not describe DB Instances");
@@ -86,18 +53,13 @@ fn main() {
         .unwrap_or_else(Vec::new)
         .into_iter()
     {
-        if matches.is_present("tags") {
-            // Parse tags
-            let tags_json = matches.value_of("tags").unwrap();
-            let tags: Vec<ArgTag> =
-                serde_json::from_str(tags_json).expect("Could not parse tags JSON");
-
+        if let Some(ref tags) = tags {
             // Get instance tags
             let ltfr_message = ListTagsForResourceMessage {
                 resource_name: db.db_instance_arn.clone().unwrap(),
                 filters: None,
             };
-            let tl_message = rds
+            let tl_message = client
                 .list_tags_for_resource(ltfr_message)
                 .sync()
                 .expect(&format!(
@@ -130,6 +92,56 @@ fn main() {
             });
         };
     }
+
+    data
+}
+
+fn main() {
+    let mut tags = None::<Vec<ArgTag>>;
+
+    // Parse CLI parameters
+    let yaml = load_yaml!("clap.yml");
+    let matches = App::from_yaml(yaml).get_matches();
+
+    let region = matches
+        .value_of("region")
+        .unwrap()
+        .parse::<Region>()
+        .unwrap();
+    let role = matches.value_of("role").unwrap();
+
+    // Get auto-refreshing credentials from STS
+    let sts = StsClient::new(region.clone());
+
+    let provider = StsAssumeRoleSessionCredentialsProvider::new(
+        sts,
+        role.to_owned(),
+        "zabbix-discovery".to_owned(),
+        None,
+        None,
+        None,
+        None,
+    );
+
+    let auto_refreshing_provider =
+        AutoRefreshingProvider::new(provider).expect("Could not get auto refreshing STS provider");
+
+    // Get RDS Client
+    let rds = RdsClient::new_with(
+        HttpClient::new().expect("Could not get HTTP client"),
+        auto_refreshing_provider,
+        region.clone(),
+    );
+
+    // Should we match some tags ?
+    if matches.is_present("tags") {
+        // Parse tags
+        let tags_json = matches.value_of("tags").unwrap();
+        tags = serde_json::from_str(tags_json).expect("Could not parse tags JSON");
+    };
+
+    // Discover instances
+    let data = discover_rds_instances(rds, tags);
 
     // Print Zabbix Data
     println!(
