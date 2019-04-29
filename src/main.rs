@@ -62,19 +62,23 @@ fn main() {
         None,
     );
 
-    let auto_refreshing_provider = AutoRefreshingProvider::new(provider).unwrap();
+    let auto_refreshing_provider =
+        AutoRefreshingProvider::new(provider).expect("Could not get auto refreshing STS provider");
 
     // Get RDS Instances
     // TODO: implement pagination, we are currenty limited to 100 RDS instances.
     //       This should be enough for now.
     let rds = RdsClient::new_with(
-        HttpClient::new().unwrap(),
+        HttpClient::new().expect("Could not get HTTP client"),
         auto_refreshing_provider,
         region.clone(),
     );
 
     let ddbi_message = DescribeDBInstancesMessage::default();
-    let dbi_message = rds.describe_db_instances(ddbi_message).sync().unwrap();
+    let dbi_message = rds
+        .describe_db_instances(ddbi_message)
+        .sync()
+        .expect("Could not describe DB Instances");
 
     // Loop over RDS Instances
     for db in dbi_message
@@ -85,14 +89,21 @@ fn main() {
         if matches.is_present("tags") {
             // Parse tags
             let tags_json = matches.value_of("tags").unwrap();
-            let tags: Vec<ArgTag> = serde_json::from_str(tags_json).unwrap();
+            let tags: Vec<ArgTag> =
+                serde_json::from_str(tags_json).expect("Could not parse tags JSON");
 
             // Get instance tags
             let ltfr_message = ListTagsForResourceMessage {
-                resource_name: db.db_instance_arn.unwrap(),
+                resource_name: db.db_instance_arn.clone().unwrap(),
                 filters: None,
             };
-            let tl_message = rds.list_tags_for_resource(ltfr_message).sync().unwrap();
+            let tl_message = rds
+                .list_tags_for_resource(ltfr_message)
+                .sync()
+                .expect(&format!(
+                    "Could not list Tags for instance {}",
+                    db.db_instance_arn.unwrap()
+                ));
             let tag_list = tl_message.tag_list.unwrap_or_else(Vec::new);
 
             // Check for matching tags
@@ -123,6 +134,6 @@ fn main() {
     // Print Zabbix Data
     println!(
         "{}",
-        serde_json::to_string_pretty(&DiscoveryData { data }).unwrap()
+        serde_json::to_string_pretty(&DiscoveryData { data }).expect("Could not serialize Output")
     );
 }
