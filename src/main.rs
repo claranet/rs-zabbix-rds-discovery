@@ -10,9 +10,15 @@ extern crate serde_json;
 use clap::App;
 use rusoto_core::{HttpClient, Region};
 use rusoto_credential::AutoRefreshingProvider;
-use rusoto_rds::{DescribeDBInstancesMessage, Rds, RdsClient};
+use rusoto_rds::{DescribeDBInstancesMessage, ListTagsForResourceMessage, Rds, RdsClient, Tag};
 use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize)]
+struct ArgTag {
+    key: String,
+    value: String,
+}
 
 #[derive(Serialize)]
 struct DiscoveryData {
@@ -70,18 +76,48 @@ fn main() {
     let ddbi_message = DescribeDBInstancesMessage::default();
     let dbi_message = rds.describe_db_instances(ddbi_message).sync().unwrap();
 
-
     // Loop over RDS Instances
     for db in dbi_message
         .db_instances
         .unwrap_or_else(Vec::new)
         .into_iter()
     {
-        data.push(DiscoveryEntry {
-            db_instance_identifier: db.db_instance_identifier.unwrap(),
-            address: db.endpoint.clone().unwrap().address.unwrap(),
-            port: db.endpoint.unwrap().port.unwrap(),
-        });
+        if matches.is_present("tags") {
+            // Parse tags
+            let tags_json = matches.value_of("tags").unwrap();
+            let tags: Vec<ArgTag> = serde_json::from_str(tags_json).unwrap();
+
+            // Get instance tags
+            let ltfr_message = ListTagsForResourceMessage {
+                resource_name: db.db_instance_arn.unwrap(),
+                filters: None,
+            };
+            let tl_message = rds.list_tags_for_resource(ltfr_message).sync().unwrap();
+            let tag_list = tl_message.tag_list.unwrap_or_else(Vec::new);
+
+            // Check for matching tags
+            for tag in tags.into_iter() {
+                if tag_list.contains(&Tag {
+                    key: Some(tag.key.to_owned()),
+                    value: Some(tag.value.to_owned()),
+                }) {
+                    // Add instance to output and break on match
+                    data.push(DiscoveryEntry {
+                        db_instance_identifier: db.db_instance_identifier.unwrap(),
+                        address: db.endpoint.clone().unwrap().address.unwrap(),
+                        port: db.endpoint.unwrap().port.unwrap(),
+                    });
+                    break;
+                }
+            }
+        } else {
+            // Or just add instance to instance list
+            data.push(DiscoveryEntry {
+                db_instance_identifier: db.db_instance_identifier.unwrap(),
+                address: db.endpoint.clone().unwrap().address.unwrap(),
+                port: db.endpoint.unwrap().port.unwrap(),
+            });
+        };
     }
 
     // Print Zabbix Data

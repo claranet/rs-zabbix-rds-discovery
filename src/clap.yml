@@ -14,5 +14,13 @@ args:
         short: R
         long: region
         value_name: REGION
+        help: AWS region of the target account
         required: true
+        takes_value: true
+    - tags:
+        short: t
+        long: tags
+        value_name: JSON_TAGS
+        help: Tags to match while listing RDS instances. JSON list of objects.
+        required: false
         takes_value: true
