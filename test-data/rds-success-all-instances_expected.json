@@ -1,0 +1,14 @@
+{
+  "data": [
+    {
+      "{#DB}": "mysqldb",
+      "{#DB_ENDPOINT}": "mysqldb.########.us-east-1.rds.amazonaws.com",
+      "{#DB_PORT}": 3306
+    },
+    {
+      "{#DB}": "oracledb",
+      "{#DB_ENDPOINT}": "oracledb.########.us-east-1.rds.amazonaws.com",
+      "{#DB_PORT}": 1521
+    }
+  ]
+}

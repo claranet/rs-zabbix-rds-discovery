@@ -1,16 +1,9 @@
-#[macro_use(load_yaml)]
-extern crate clap;
-extern crate rusoto_core;
-extern crate rusoto_credential;
-extern crate rusoto_rds;
-extern crate rusoto_sts;
-extern crate serde;
-extern crate serde_json;
-
-use clap::App;
+use clap::{load_yaml, App};
 use rusoto_core::{HttpClient, Region};
 use rusoto_credential::AutoRefreshingProvider;
-use rusoto_rds::{DescribeDBInstancesMessage, ListTagsForResourceMessage, Rds, RdsClient, Tag};
+use rusoto_rds::{
+    DBInstanceMessage, DescribeDBInstancesMessage, ListTagsForResourceMessage, Rds, RdsClient, Tag,
+};
 use rusoto_sts::{StsAssumeRoleSessionCredentialsProvider, StsClient};
 use serde::{Deserialize, Serialize};
 
@@ -35,9 +28,7 @@ struct DiscoveryEntry {
     port: i64,
 }
 
-fn discover_rds_instances(client: RdsClient, tags: Option<Vec<ArgTag>>) -> Vec<DiscoveryEntry> {
-    let mut data = vec![];
-
+fn get_rds_instances(client: &RdsClient) -> DBInstanceMessage {
     // Get RDS Instances
     // TODO: implement pagination, we are currenty limited to 100 RDS instances.
     //       This should be enough for now.
@@ -47,8 +38,18 @@ fn discover_rds_instances(client: RdsClient, tags: Option<Vec<ArgTag>>) -> Vec<D
         .sync()
         .expect("Could not describe DB Instances");
 
+    dbi_message
+}
+
+fn discover_rds_instances(
+    client: &RdsClient,
+    db_instances: DBInstanceMessage,
+    tags: Option<Vec<ArgTag>>,
+) -> Vec<DiscoveryEntry> {
+    let mut data = vec![];
+
     // Loop over RDS Instances
-    for db in dbi_message
+    for db in db_instances
         .db_instances
         .unwrap_or_else(Vec::new)
         .into_iter()
@@ -141,11 +142,113 @@ fn main() {
     };
 
     // Discover instances
-    let data = discover_rds_instances(rds, tags);
+    let rds_instances = get_rds_instances(&rds);
+    let data = discover_rds_instances(&rds, rds_instances, tags);
 
     // Print Zabbix Data
     println!(
         "{}",
         serde_json::to_string_pretty(&DiscoveryData { data }).expect("Could not serialize Output")
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use super::*;
+    use assert_json_diff::assert_json_eq;
+    use rusoto_mock::*;
+    use rusoto_rds::RdsClient;
+
+    #[test]
+    fn return_all_instances() {
+        let rds = RdsClient::new_with(
+            MockRequestDispatcher::default().with_body(&MockResponseReader::read_response(
+                "test-data",
+                "rds-success-all-instances.xml",
+            )),
+            MockCredentialsProvider,
+            Default::default(),
+        );
+
+        let rds_instances = get_rds_instances(&rds);
+        let data = discover_rds_instances(&rds, rds_instances, None);
+        let json = serde_json::to_value(DiscoveryData { data }).unwrap();
+
+        let file = fs::File::open("test-data/rds-success-all-instances_expected.json").unwrap();
+        let expected_json = serde_json::from_reader(file).unwrap();
+
+        assert_json_eq!(json, expected_json)
+    }
+
+    #[test]
+    fn return_match() {
+        let rds_client_instances = RdsClient::new_with(
+            MockRequestDispatcher::default().with_body(&MockResponseReader::read_response(
+                "test-data",
+                "rds-success-match_DescribDBInstances.xml",
+            )),
+            MockCredentialsProvider,
+            Default::default(),
+        );
+
+        let rds_client_tags = RdsClient::new_with(
+            MockRequestDispatcher::default().with_body(&MockResponseReader::read_response(
+                "test-data",
+                "rds-success-match_ListTagsForResource.xml",
+            )),
+            MockCredentialsProvider,
+            Default::default(),
+        );
+
+        let tags = vec![ArgTag {
+            key: "project".to_string(),
+            value: "foo".to_string(),
+        }];
+
+        let rds_instances = get_rds_instances(&rds_client_instances);
+        let data = discover_rds_instances(&rds_client_tags, rds_instances, Some(tags));
+        let json = serde_json::to_value(DiscoveryData { data }).unwrap();
+
+        let file = fs::File::open("test-data/rds-success-match_expected.json").unwrap();
+        let expected_json = serde_json::from_reader(file).unwrap();
+
+        assert_json_eq!(json, expected_json)
+    }
+
+    #[test]
+    fn return_no_match() {
+        let rds_client_instances = RdsClient::new_with(
+            MockRequestDispatcher::default().with_body(&MockResponseReader::read_response(
+                "test-data",
+                "rds-success-no-match_DescribDBInstances.xml",
+            )),
+            MockCredentialsProvider,
+            Default::default(),
+        );
+
+        let rds_client_tags = RdsClient::new_with(
+            MockRequestDispatcher::default().with_body(&MockResponseReader::read_response(
+                "test-data",
+                "rds-success-no-match_ListTagsForResource.xml",
+            )),
+            MockCredentialsProvider,
+            Default::default(),
+        );
+
+        let tags = vec![ArgTag {
+            key: "project".to_string(),
+            value: "bar".to_string(),
+        }];
+
+        let rds_instances = get_rds_instances(&rds_client_instances);
+        let data = discover_rds_instances(&rds_client_tags, rds_instances, Some(tags));
+        let json = serde_json::to_value(DiscoveryData { data }).unwrap();
+
+        let file = fs::File::open("test-data/rds-success-no-match_expected.json").unwrap();
+        let expected_json = serde_json::from_reader(file).unwrap();
+
+        assert_json_eq!(json, expected_json)
+    }
 }

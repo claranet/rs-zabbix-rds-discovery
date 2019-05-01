@@ -1,0 +1,17 @@
+<ListTagsForResourceResponse xmlns="http://rds.amazonaws.com/doc/2014-10-31/">
+  <ListTagsForResourceResult>
+    <TagList>
+      <Tag>
+        <Value>foo</Value>
+        <Key>project</Key>
+      </Tag>
+      <Tag>
+        <Value>test</Value>
+        <Key>environment</Key>
+      </Tag>
+    </TagList>
+  </ListTagsForResourceResult>
+  <ResponseMetadata>
+    <RequestId>71217a3c-e24b-11e5-a5e9-cad172f9e6c1</RequestId>
+  </ResponseMetadata>
+</ListTagsForResourceResponse>

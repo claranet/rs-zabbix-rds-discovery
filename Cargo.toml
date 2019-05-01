@@ -5,10 +5,38 @@ authors = ["Adrien Bréfort <adrien.brefort@fr.clara.net>"]
 edition = "2018"
 
 [dependencies]
-clap = {version = "2.33", features = ["yaml"]}
-rusoto_core = {version = "0.38.0", default_features = false, features=["rustls"]}
 rusoto_credential = "0.17.0"
-rusoto_sts = {version = "0.38.0", default_features = false, features=["rustls"]}
-rusoto_rds = {version = "0.38.0", default_features = false, features=["rustls"]}
-serde = {version = "1.0", features = ["derive"]}
 serde_json = "1.0.39"
+
+[dependencies.clap]
+version = "2.33"
+features = ["yaml"]
+
+[dependencies.rusoto_core]
+version = "0.38.0"
+default-features = false
+
+[dependencies.rusoto_rds]
+version = "0.38.0"
+default-features = false
+
+[dependencies.rusoto_sts]
+version = "0.38.0"
+default-features = false
+
+[dependencies.serde]
+version = "1.0"
+features = ["derive"]
+
+[dev-dependencies]
+assert-json-diff = "1.0.0"
+
+[dev-dependencies.rusoto_mock]
+git = "https://github.com/abrefort/rusoto"
+branch = "patched_mock"
+default-features = false
+
+[features]
+default = ["native-tls"]
+native-tls = ["rusoto_core/native-tls", "rusoto_rds/native-tls", "rusoto_sts/native-tls", "rusoto_mock/native-tls"]
+rustls = ["rusoto_core/rustls", "rusoto_rds/rustls", "rusoto_sts/rustls", "rusoto_mock/rustls"]
