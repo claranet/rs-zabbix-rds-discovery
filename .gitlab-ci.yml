@@ -1,0 +1,26 @@
+image: rust:1.34
+
+stages:
+  - test
+  - build
+
+test_native-tls:
+  stage: test
+  script:
+    - cargo test
+
+test_rustl:
+  stage: test
+  script:
+    - cargo test --no-default-features --features rustls
+
+tag_release:
+  stage: build
+  script:
+    - cargo build --release --no-default-features --features rustls
+  artifact:
+    name: "rs-zabbix-rds-discovery_$CI_COMMIT_TAG_linux-x64"
+    paths:
+      - target/release/rs-zabbix-rds-discovery
+  only:
+    - tags
