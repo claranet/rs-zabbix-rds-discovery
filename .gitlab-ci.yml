@@ -8,11 +8,15 @@ test_native-tls:
   stage: test
   script:
     - cargo test
+  tags:
+    - default
 
 test_rustl:
   stage: test
   script:
     - cargo test --no-default-features --features rustls
+  tags:
+    - default
 
 tag_release:
   stage: build
@@ -24,3 +28,5 @@ tag_release:
       - target/release/rs-zabbix-rds-discovery
   only:
     - tags
+  tags:
+    - default
