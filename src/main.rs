@@ -49,12 +49,10 @@ fn get_rds_instances(client: &RdsClient) -> DBInstanceMessage {
     // TODO: implement pagination, we are currenty limited to 100 RDS instances.
     //       This should be enough for now.
     let ddbi_message = DescribeDBInstancesMessage::default();
-    let dbi_message = client
+    client
         .describe_db_instances(ddbi_message)
         .sync()
-        .expect("Could not describe DB Instances");
-
-    dbi_message
+        .expect("Could not describe DB Instances")
 }
 
 fn discover_rds_instances(
@@ -79,14 +77,16 @@ fn discover_rds_instances(
             let tl_message = client
                 .list_tags_for_resource(ltfr_message)
                 .sync()
-                .expect(&format!(
-                    "Could not list Tags for instance {}",
-                    db.db_instance_arn.unwrap()
-                ));
+                .unwrap_or_else(|_| {
+                    panic!(
+                        "Could not list Tags for instance {}",
+                        db.clone().db_instance_arn.unwrap()
+                    )
+                });
             let tag_list = tl_message.tag_list.unwrap_or_else(Vec::new);
 
             // Check for matching tags
-            for tag in tags.into_iter() {
+            for tag in tags.iter() {
                 if tag_list.contains(&Tag {
                     key: Some(tag.key.to_owned()),
                     value: Some(tag.value.to_owned()),
@@ -147,7 +147,7 @@ fn main() {
     let rds = RdsClient::new_with(
         HttpClient::new().expect("Could not get HTTP client"),
         auto_refreshing_provider,
-        region.clone(),
+        region,
     );
 
     // Should we match some tags ?
